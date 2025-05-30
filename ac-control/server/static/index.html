@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AC Control Panel</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { margin: 10px; padding: 10px 20px; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>AC Control Panel</h1>
+  <p>Current AC Status: <strong id="acStatus">Loading...</strong></p>
+
+  <button onclick="turnOn('room1')">Turn ON AC (Room 1)</button>
+  <button onclick="turnOn('room2')">Turn ON AC (Room 2)</button>
+  <button onclick="turnOff()">Turn OFF AC</button>
+
+  <p class="error" id="errorMsg"></p>
+
+  <script>
+    const statusEl = document.getElementById("acStatus");
+    const errorEl = document.getElementById("errorMsg");
+
+    function fetchStatus() {
+      fetch('/api/status')
+        .then(res => res.json())
+        .then(data => {
+          statusEl.textContent = data.ac;
+          errorEl.textContent = '';
+        })
+        .catch(() => {
+          errorEl.textContent = 'Cannot connect to server';
+        });
+    }
+
+    function turnOn(room) {
+      fetch('/api/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room })
+      }).then(res => {
+        if (res.ok) return res.json();
+        return res.json().then(err => Promise.reject(err));
+      }).then(data => {
+        statusEl.textContent = data.ac;
+        errorEl.textContent = '';
+      }).catch(err => {
+        errorEl.textContent = `AC already ON by ${err.ac}`;
+      });
+    }
+
+    function turnOff() {
+      fetch('/api/off', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          statusEl.textContent = data.ac;
+          errorEl.textContent = '';
+        });
+    }
+
+    fetchStatus();
+    setInterval(fetchStatus, 5020);
+  </script>
+</body>
+</html>
