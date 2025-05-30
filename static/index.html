@@ -1,20 +1,126 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Control Panel</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    button { margin: 10px; padding: 10px 20px; }
-    .error { color: red; }
+    /* Reset & base */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      margin: 0;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      color: #333;
+    }
+    h1 {
+      margin-bottom: 0.5rem;
+      font-weight: 700;
+      color: #2c3e50;
+    }
+    p {
+      font-size: 1.1rem;
+      margin: 0.2rem 0 1.5rem;
+    }
+    strong#acStatus {
+      color: #2980b9;
+      font-weight: 700;
+    }
+    
+    /* Buttons container */
+    .btn-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    button {
+      flex: 1 1 120px;
+      padding: 15px 20px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      color: white;
+      user-select: none;
+    }
+    button:active {
+      transform: scale(0.98);
+    }
+    button:focus {
+      outline: 3px solid #2980b9;
+      outline-offset: 2px;
+    }
+
+    button.turn-on-room1 {
+      background-color: #27ae60;
+    }
+    button.turn-on-room1:hover {
+      background-color: #219150;
+      box-shadow: 0 4px 12px rgba(39, 174, 96, 0.5);
+    }
+    button.turn-on-room2 {
+      background-color: #2980b9;
+    }
+    button.turn-on-room2:hover {
+      background-color: #1c5d8b;
+      box-shadow: 0 4px 12px rgba(41, 128, 185, 0.5);
+    }
+    button.turn-off {
+      background-color: #c0392b;
+    }
+    button.turn-off:hover {
+      background-color: #992d22;
+      box-shadow: 0 4px 12px rgba(192, 57, 43, 0.5);
+    }
+
+    /* Error message */
+    .error {
+      color: #e74c3c;
+      font-weight: 600;
+      text-align: center;
+      min-height: 1.2em;
+      margin-top: 0.5rem;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 400px) {
+      body {
+        padding: 15px 10px;
+      }
+      button {
+        font-size: 1rem;
+        padding: 12px 15px;
+      }
+      .btn-container {
+        max-width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
   <h1>AC Control Panel</h1>
   <p>Current AC Status: <strong id="acStatus">Loading...</strong></p>
 
-  <button onclick="turnOn('room1')">Turn ON AC (Room 1)</button>
-  <button onclick="turnOn('room2')">Turn ON AC (Room 2)</button>
-  <button onclick="turnOff()">Turn OFF AC</button>
+  <div class="btn-container">
+    <button class="turn-on-room1" onclick="turnOn('room1')">Turn ON AC (Room 1)</button>
+    <button class="turn-on-room2" onclick="turnOn('room2')">Turn ON AC (Room 2)</button>
+    <button class="turn-off" onclick="turnOff()">Turn OFF AC</button>
+  </div>
 
   <p class="error" id="errorMsg"></p>
 
@@ -26,7 +132,7 @@
       fetch('/api/status')
         .then(res => res.json())
         .then(data => {
-          statusEl.textContent = data.ac;
+          statusEl.textContent = data.ac === 'none' ? 'OFF' : data.ac;
           errorEl.textContent = '';
         })
         .catch(() => {
@@ -54,13 +160,13 @@
       fetch('/api/off', { method: 'POST' })
         .then(res => res.json())
         .then(data => {
-          statusEl.textContent = data.ac;
+          statusEl.textContent = 'OFF';
           errorEl.textContent = '';
         });
     }
 
     fetchStatus();
-    setInterval(fetchStatus, 5020);
+    setInterval(fetchStatus, 5000);
   </script>
 </body>
 </html>
