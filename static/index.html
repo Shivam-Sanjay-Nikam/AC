@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Control Panel</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #f0f4f8;
@@ -19,19 +17,9 @@
       min-height: 100vh;
       color: #333;
     }
-    h1 {
-      margin-bottom: 0.5rem;
-      font-weight: 700;
-      color: #2c3e50;
-    }
-    p {
-      font-size: 1.1rem;
-      margin: 0.2rem 0 1.5rem;
-    }
-    strong#acStatus {
-      color: #2980b9;
-      font-weight: 700;
-    }
+    h1 { margin-bottom: 0.5rem; font-weight: 700; color: #2c3e50; }
+    p { font-size: 1.1rem; margin: 0.2rem 0 1.5rem; }
+    strong#acStatus { color: #2980b9; font-weight: 700; }
 
     .btn-container {
       display: flex;
@@ -56,34 +44,14 @@
       color: white;
       user-select: none;
     }
-    button:active {
-      transform: scale(0.98);
-    }
-    button:focus {
-      outline: 3px solid #2980b9;
-      outline-offset: 2px;
-    }
-    button.turn-on-room1 {
-      background-color: #27ae60;
-    }
-    button.turn-on-room1:hover {
-      background-color: #219150;
-      box-shadow: 0 4px 12px rgba(39, 174, 96, 0.5);
-    }
-    button.turn-on-room2 {
-      background-color: #2980b9;
-    }
-    button.turn-on-room2:hover {
-      background-color: #1c5d8b;
-      box-shadow: 0 4px 12px rgba(41, 128, 185, 0.5);
-    }
-    button.turn-off {
-      background-color: #c0392b;
-    }
-    button.turn-off:hover {
-      background-color: #992d22;
-      box-shadow: 0 4px 12px rgba(192, 57, 43, 0.5);
-    }
+    button:active { transform: scale(0.98); }
+    button:focus { outline: 3px solid #2980b9; outline-offset: 2px; }
+    button.turn-on-room1 { background-color: #27ae60; }
+    button.turn-on-room1:hover { background-color: #219150; }
+    button.turn-on-room2 { background-color: #2980b9; }
+    button.turn-on-room2:hover { background-color: #1c5d8b; }
+    button.turn-off { background-color: #c0392b; }
+    button.turn-off:hover { background-color: #992d22; }
 
     .error {
       color: #e74c3c;
@@ -94,16 +62,9 @@
     }
 
     @media (max-width: 400px) {
-      body {
-        padding: 15px 10px;
-      }
-      button {
-        font-size: 1rem;
-        padding: 12px 15px;
-      }
-      .btn-container {
-        max-width: 100%;
-      }
+      body { padding: 15px 10px; }
+      button { font-size: 1rem; padding: 12px 15px; }
+      .btn-container { max-width: 100%; }
     }
   </style>
 </head>
@@ -112,8 +73,8 @@
   <p>Current AC Status: <strong id="acStatus">Loading...</strong></p>
 
   <div class="btn-container">
-    <button class="turn-on-room1" onclick="turnOn('room1')">Turn ON AC (Room Shivam (room1))</button>
-    <button class="turn-on-room2" onclick="turnOn('room2')">Turn ON AC (Room Devansh (room2))</button>
+    <button class="turn-on-room1" onclick="turnOn('room1')">Turn ON AC (Shivam - Room 1)</button>
+    <button class="turn-on-room2" onclick="turnOn('room2')">Turn ON AC (Devansh - Room 2)</button>
     <button class="turn-off" onclick="turnOff()">Turn OFF AC</button>
   </div>
 
@@ -128,15 +89,16 @@
     let timerInterval = null;
 
     function formatDuration(ms) {
-      const totalSeconds = Math.floor(ms / 1000);
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = totalSeconds % 60;
+      const sec = Math.floor(ms / 1000);
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
       return `${h}h ${m}m ${s}s`;
     }
 
-    function startTimer(startTs) {
-      startTime = new Date(startTs * 1000);
+    function startTimer(ts) {
+      if (startTime && startTime.getTime() === ts * 1000) return;
+      startTime = new Date(ts * 1000);
       clearInterval(timerInterval);
       timerInterval = setInterval(() => {
         const now = new Date();
@@ -147,7 +109,6 @@
 
     function stopTimer() {
       clearInterval(timerInterval);
-      timerInterval = null;
       startTime = null;
       currentRoom = null;
       statusEl.textContent = 'OFF';
@@ -157,17 +118,13 @@
       fetch('/api/status')
         .then(res => res.json())
         .then(data => {
-          errorEl.textContent = '';
           if (data.ac === 'none') {
             stopTimer();
           } else {
             currentRoom = data.ac;
-            if (data.startTime) {
-              startTimer(data.startTime);
-            } else {
-              statusEl.textContent = `${currentRoom} (Running)`;
-            }
+            startTimer(data.startTime);
           }
+          errorEl.textContent = '';
         })
         .catch(() => {
           errorEl.textContent = 'Cannot connect to server';
@@ -175,6 +132,8 @@
     }
 
     function turnOn(room) {
+      if (room === currentRoom) return; // Already ON
+
       fetch('/api/set', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
