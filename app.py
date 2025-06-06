@@ -7,87 +7,77 @@ app = Flask(__name__, static_folder='static')
 CORS(app)
 
 STATUS_FILE = 'status.json'
-LOG_FILE = 'log.json'
-COOLDOWN_SECONDS = 300  # 5 minutes
+FIVE_MIN = 5 * 60
+
+def now(): return int(time.time())
 
 def get_status():
+    if not os.path.exists(STATUS_FILE):
+        return {"ac": "none", "startTime": None, "duration": 0, "lastAC": None, "lastOffTime": None}
+
     with open(STATUS_FILE, 'r') as f:
         return json.load(f)
 
-def set_status(data):
+def save_status(data):
     with open(STATUS_FILE, 'w') as f:
         json.dump(data, f)
 
-def log_session(room, start, end):
-    entry = {
-        "room": room,
-        "start": datetime.utcfromtimestamp(start).isoformat(),
-        "end": datetime.utcfromtimestamp(end).isoformat(),
-        "duration_seconds": int(end - start)
-    }
-    if not os.path.exists(LOG_FILE):
-        with open(LOG_FILE, 'w') as f:
-            json.dump([entry], f, indent=2)
-    else:
-        with open(LOG_FILE, 'r+') as f:
-            log = json.load(f)
-            log.append(entry)
-            f.seek(0)
-            json.dump(log, f, indent=2)
-
 @app.route('/')
-def index():
+def serve_index():
     return send_from_directory('static', 'index.html')
 
-@app.route('/api/status')
+@app.route('/api/status', methods=['GET'])
 def status():
-    status = get_status()
-    return jsonify(status)
+    data = get_status()
+    if data['ac'] != 'none' and data['startTime']:
+        duration = now() - data['startTime'] + data.get('duration', 0)
+    else:
+        duration = data.get('duration', 0)
+    data['displayDuration'] = duration
+    return jsonify(data)
 
 @app.route('/api/set', methods=['POST'])
 def turn_on():
-    data = request.get_json()
-    room = data['room']
-    now = int(time.time())
-    status = get_status()
+    data = get_status()
+    req = request.get_json()
+    room = req.get('room')
+    current_time = now()
 
-    if status['ac'] == room:
-        return jsonify({'ac': room, 'startTime': status['startTime']})
+    if data['ac'] != 'none':
+        return jsonify({'status': 'conflict', 'ac': data['ac']}), 409
 
-    if status['ac'] != 'none':
-        return jsonify({'status': 'conflict', 'ac': status['ac']}), 409
+    # Check if resumed within 5 mins
+    if data.get('lastAC') == room and data.get('lastOffTime') and current_time - data['lastOffTime'] < FIVE_MIN:
+        # resume timer
+        data['ac'] = room
+        data['startTime'] = current_time
+    else:
+        data = {
+            "ac": room,
+            "startTime": current_time,
+            "duration": 0,
+            "lastAC": room,
+            "lastOffTime": None
+        }
 
-    last_off = status.get('lastOffTime', 0)
-    last_room = status.get('lastRoom', None)
-    reuse_start = (now - last_off <= COOLDOWN_SECONDS and last_room == room)
-
-    start_time = status.get('startTime') if reuse_start else now
-
-    set_status({
-        'ac': room,
-        'startTime': start_time,
-        'lastRoom': room
-    })
-
-    return jsonify({'ac': room, 'startTime': start_time})
+    save_status(data)
+    return jsonify({'status': 'ok', 'ac': room})
 
 @app.route('/api/off', methods=['POST'])
 def turn_off():
-    now = int(time.time())
-    status = get_status()
-    if status['ac'] != 'none':
-        log_session(status['ac'], status['startTime'], now)
+    data = get_status()
+    if data['ac'] != 'none' and data.get('startTime'):
+        elapsed = now() - data['startTime']
+        data['duration'] = data.get('duration', 0) + elapsed
+        data['lastAC'] = data['ac']
+        data['lastOffTime'] = now()
 
-    set_status({
-        'ac': 'none',
-        'lastRoom': status.get('ac'),
-        'lastOffTime': now
-    })
-
+    data['ac'] = 'none'
+    data['startTime'] = None
+    save_status(data)
     return jsonify({'status': 'ok', 'ac': 'none'})
 
 if __name__ == '__main__':
     if not os.path.exists(STATUS_FILE):
-        with open(STATUS_FILE, 'w') as f:
-            json.dump({'ac': 'none'}, f)
+        save_status({"ac": "none", "startTime": None, "duration": 0, "lastAC": None, "lastOffTime": None})
     app.run(host='0.0.0.0', port=5000)
