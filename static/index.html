@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Control Panel</title>
   <style>
-    /* Reset & base */
     * {
       box-sizing: border-box;
     }
@@ -33,8 +32,7 @@
       color: #2980b9;
       font-weight: 700;
     }
-    
-    /* Buttons container */
+
     .btn-container {
       display: flex;
       flex-wrap: wrap;
@@ -65,7 +63,6 @@
       outline: 3px solid #2980b9;
       outline-offset: 2px;
     }
-
     button.turn-on-room1 {
       background-color: #27ae60;
     }
@@ -88,7 +85,6 @@
       box-shadow: 0 4px 12px rgba(192, 57, 43, 0.5);
     }
 
-    /* Error message */
     .error {
       color: #e74c3c;
       font-weight: 600;
@@ -97,7 +93,6 @@
       margin-top: 0.5rem;
     }
 
-    /* Responsive adjustments */
     @media (max-width: 400px) {
       body {
         padding: 15px 10px;
@@ -118,7 +113,7 @@
 
   <div class="btn-container">
     <button class="turn-on-room1" onclick="turnOn('room1')">Turn ON AC (Room Shivam (room1))</button>
-    <button class="turn-on-room2" onclick="turnOn('room2')">Turn ON AC (Room Devansh (room2)</button>
+    <button class="turn-on-room2" onclick="turnOn('room2')">Turn ON AC (Room Devansh (room2))</button>
     <button class="turn-off" onclick="turnOff()">Turn OFF AC</button>
   </div>
 
@@ -128,12 +123,51 @@
     const statusEl = document.getElementById("acStatus");
     const errorEl = document.getElementById("errorMsg");
 
+    let currentRoom = null;
+    let startTime = null;
+    let timerInterval = null;
+
+    function formatDuration(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      return `${h}h ${m}m ${s}s`;
+    }
+
+    function startTimer(startTs) {
+      startTime = new Date(startTs * 1000);
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        const now = new Date();
+        const diff = now - startTime;
+        statusEl.textContent = `${currentRoom} (On for ${formatDuration(diff)})`;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      startTime = null;
+      currentRoom = null;
+      statusEl.textContent = 'OFF';
+    }
+
     function fetchStatus() {
       fetch('/api/status')
         .then(res => res.json())
         .then(data => {
-          statusEl.textContent = data.ac === 'none' ? 'OFF' : data.ac;
           errorEl.textContent = '';
+          if (data.ac === 'none') {
+            stopTimer();
+          } else {
+            currentRoom = data.ac;
+            if (data.startTime) {
+              startTimer(data.startTime);
+            } else {
+              statusEl.textContent = `${currentRoom} (Running)`;
+            }
+          }
         })
         .catch(() => {
           errorEl.textContent = 'Cannot connect to server';
@@ -149,7 +183,8 @@
         if (res.ok) return res.json();
         return res.json().then(err => Promise.reject(err));
       }).then(data => {
-        statusEl.textContent = data.ac;
+        currentRoom = data.ac;
+        startTimer(data.startTime);
         errorEl.textContent = '';
       }).catch(err => {
         errorEl.textContent = `AC already ON by ${err.ac}`;
@@ -159,8 +194,8 @@
     function turnOff() {
       fetch('/api/off', { method: 'POST' })
         .then(res => res.json())
-        .then(data => {
-          statusEl.textContent = 'OFF';
+        .then(() => {
+          stopTimer();
           errorEl.textContent = '';
         });
     }
