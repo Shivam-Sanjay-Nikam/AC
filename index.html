@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AC Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background-color: #f7f7f7;
+    }
+    .room {
+      background: white;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+      max-width: 400px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .room h2 {
+      margin-bottom: 0.5rem;
+    }
+    .timer {
+      margin-top: 0.5rem;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    input[type="checkbox"] {
+      transform: scale(1.3);
+      margin-left: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="room" id="shivam-room">
+    <h2>Shivam's Room AC <input type="checkbox" id="shivam-toggle"></h2>
+    <div class="timer" id="shivam-timer">Time ON: 0s</div>
+  </div>
+
+  <div class="room" id="devansh-room">
+    <h2>Devansh's Room AC <input type="checkbox" id="devansh-toggle"></h2>
+    <div class="timer" id="devansh-timer">Time ON: 0s</div>
+  </div>
+
+  <script>
+    const shivamToggle = document.getElementById("shivam-toggle");
+    const devanshToggle = document.getElementById("devansh-toggle");
+
+    const shivamTimerDisplay = document.getElementById("shivam-timer");
+    const devanshTimerDisplay = document.getElementById("devansh-timer");
+
+    const STATE_KEY = "ac_tracker_state";
+
+    let state = {
+      shivam: { isOn: false, totalTime: 0, timerStart: null, lastOff: null, interval: null },
+      devansh: { isOn: false, totalTime: 0, timerStart: null, lastOff: null, interval: null }
+    };
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
+    }
+
+    function updateDisplay(room) {
+      const data = state[room];
+      const display = room === "shivam" ? shivamTimerDisplay : devanshTimerDisplay;
+      let elapsed = data.totalTime;
+      if (data.isOn && data.timerStart) {
+        elapsed += Math.floor((Date.now() - data.timerStart) / 1000);
+      }
+      display.textContent = `Time ON: ${formatTime(elapsed)}`;
+    }
+
+    function stopOtherAC(activeRoom) {
+      const otherRoom = activeRoom === "shivam" ? "devansh" : "shivam";
+      if (state[otherRoom].isOn) {
+        document.getElementById(`${otherRoom}-toggle`).checked = false;
+        toggleAC(otherRoom, false);
+      }
+    }
+
+    function toggleAC(room, turnOn) {
+      const data = state[room];
+      const now = Date.now();
+
+      if (turnOn) {
+        stopOtherAC(room);
+
+        if (data.lastOff && now - data.lastOff < 5 * 60 * 1000) {
+          // Resume previous session
+        } else {
+          data.totalTime = 0;
+        }
+
+        data.timerStart = now;
+        data.isOn = true;
+        data.interval = setInterval(() => updateDisplay(room), 1000);
+      } else {
+        if (data.isOn && data.timerStart) {
+          const elapsed = Math.floor((now - data.timerStart) / 1000);
+          data.totalTime += elapsed;
+          data.lastOff = now;
+        }
+
+        data.isOn = false;
+        data.timerStart = null;
+        clearInterval(data.interval);
+      }
+
+      updateDisplay(room);
+      saveState();
+    }
+
+    function saveState() {
+      const temp = JSON.parse(JSON.stringify(state));
+      delete temp.shivam.interval;
+      delete temp.devansh.interval;
+      localStorage.setItem(STATE_KEY, JSON.stringify(temp));
+    }
+
+    function loadState() {
+      const saved = localStorage.getItem(STATE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        for (const room of ["shivam", "devansh"]) {
+          Object.assign(state[room], parsed[room]);
+
+          // Resume timers if needed
+          if (state[room].isOn) {
+            state[room].interval = setInterval(() => updateDisplay(room), 1000);
+          }
+        }
+
+        shivamToggle.checked = state.shivam.isOn;
+        devanshToggle.checked = state.devansh.isOn;
+
+        updateDisplay("shivam");
+        updateDisplay("devansh");
+      }
+    }
+
+    shivamToggle.addEventListener("change", () => toggleAC("shivam", shivamToggle.checked));
+    devanshToggle.addEventListener("change", () => toggleAC("devansh", devanshToggle.checked));
+
+    loadState();
+  </script>
+</body>
+</html>
