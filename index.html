@@ -6,30 +6,52 @@
   <title>AC Tracker</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 2rem;
-      background-color: #f7f7f7;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f0f4f8;
+      padding: 2rem;
     }
+
     .room {
       background: white;
+      padding: 1.5rem;
       margin-bottom: 2rem;
-      padding: 1rem;
-      border: 2px solid #ccc;
-      border-radius: 10px;
-      max-width: 400px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
     }
+
     .room h2 {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    input[type="checkbox"] {
+      transform: scale(1.5);
+      accent-color: #007bff;
+    }
+
+    .timer {
+      font-size: 1rem;
+      font-weight: bold;
       margin-bottom: 0.5rem;
     }
-    .timer {
+
+    .status {
+      font-size: 0.95rem;
+      color: #444;
+      background: #eef6ff;
+      padding: 0.75rem;
+      border-left: 4px solid #007bff;
+      border-radius: 6px;
       margin-top: 0.5rem;
-      font-weight: bold;
-      font-size: 1.1rem;
     }
-    input[type="checkbox"] {
-      transform: scale(1.3);
-      margin-left: 1rem;
+
+    .status.alert {
+      border-left-color: #ff4d4f;
+      background: #fff2f0;
+      color: #a8071a;
     }
   </style>
 </head>
@@ -38,11 +60,13 @@
   <div class="room" id="shivam-room">
     <h2>Shivam's Room AC <input type="checkbox" id="shivam-toggle"></h2>
     <div class="timer" id="shivam-timer">Time ON: 0s</div>
+    <div class="status" id="shivam-status">AC is OFF. You can switch it ON.</div>
   </div>
 
   <div class="room" id="devansh-room">
     <h2>Devansh's Room AC <input type="checkbox" id="devansh-toggle"></h2>
     <div class="timer" id="devansh-timer">Time ON: 0s</div>
+    <div class="status" id="devansh-status">AC is OFF. You can switch it ON.</div>
   </div>
 
   <script>
@@ -51,6 +75,9 @@
 
     const shivamTimerDisplay = document.getElementById("shivam-timer");
     const devanshTimerDisplay = document.getElementById("devansh-timer");
+
+    const shivamStatus = document.getElementById("shivam-status");
+    const devanshStatus = document.getElementById("devansh-status");
 
     const STATE_KEY = "ac_tracker_state";
 
@@ -68,16 +95,37 @@
     function updateDisplay(room) {
       const data = state[room];
       const display = room === "shivam" ? shivamTimerDisplay : devanshTimerDisplay;
+      const statusBox = room === "shivam" ? shivamStatus : devanshStatus;
+
       let elapsed = data.totalTime;
       if (data.isOn && data.timerStart) {
         elapsed += Math.floor((Date.now() - data.timerStart) / 1000);
       }
+
       display.textContent = `Time ON: ${formatTime(elapsed)}`;
+
+      if (data.isOn) {
+        if (elapsed > 3600) {
+          statusBox.textContent = `${capitalize(room)} may have fallen asleep or forgotten to turn off the AC.`;
+          statusBox.classList.add("alert");
+        } else {
+          statusBox.textContent = `${capitalize(room)}'s AC is currently ON.`;
+          statusBox.classList.remove("alert");
+        }
+      } else {
+        statusBox.textContent = `AC is OFF. You can switch it ON.`;
+        statusBox.classList.remove("alert");
+      }
+    }
+
+    function capitalize(text) {
+      return text.charAt(0).toUpperCase() + text.slice(1);
     }
 
     function stopOtherAC(activeRoom) {
       const otherRoom = activeRoom === "shivam" ? "devansh" : "shivam";
       if (state[otherRoom].isOn) {
+        alert(`${capitalize(otherRoom)}'s AC is already ON. Turning it OFF.`);
         document.getElementById(`${otherRoom}-toggle`).checked = false;
         toggleAC(otherRoom, false);
       }
@@ -90,8 +138,8 @@
       if (turnOn) {
         stopOtherAC(room);
 
-        if (data.lastOff && now - data.lastOff < 1 * 60 * 1000) {
-          // Resume previous session
+        if (data.lastOff && now - data.lastOff < 60 * 1000) {
+          // Quick restart
         } else {
           data.totalTime = 0;
         }
@@ -128,16 +176,12 @@
         const parsed = JSON.parse(saved);
         for (const room of ["shivam", "devansh"]) {
           Object.assign(state[room], parsed[room]);
-
-          // Resume timers if needed
           if (state[room].isOn) {
             state[room].interval = setInterval(() => updateDisplay(room), 1000);
           }
         }
-
         shivamToggle.checked = state.shivam.isOn;
         devanshToggle.checked = state.devansh.isOn;
-
         updateDisplay("shivam");
         updateDisplay("devansh");
       }
