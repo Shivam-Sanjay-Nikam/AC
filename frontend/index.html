@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AC Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background-color: #f0f2f5;
+    }
+    .room {
+      background: #fff;
+      margin-bottom: 2rem;
+      padding: 1rem 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      max-width: 420px;
+    }
+    .room h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.3rem;
+    }
+    .status-msg {
+      margin-top: 0.5rem;
+      font-size: 0.95rem;
+      color: #555;
+    }
+    .timer {
+      margin-top: 0.5rem;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    input[type="checkbox"] {
+      transform: scale(1.3);
+      margin-left: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="room" id="shivam-room">
+    <h2>Shivam's Room AC <input type="checkbox" id="shivam-toggle"></h2>
+    <div class="status-msg" id="shivam-msg"></div>
+    <div class="timer" id="shivam-timer">Time ON: 0s</div>
+  </div>
+
+  <div class="room" id="devansh-room">
+    <h2>Devansh's Room AC <input type="checkbox" id="devansh-toggle"></h2>
+    <div class="status-msg" id="devansh-msg"></div>
+    <div class="timer" id="devansh-timer">Time ON: 0s</div>
+  </div>
+
+  <script>
+    const BACKEND_URL = "https://your-flask-backend.onrender.com"; // Replace with actual backend URL
+
+    const rooms = ["shivam", "devansh"];
+    const state = {
+      shivam: { isOn: false, totalTime: 0, timerStart: null, interval: null },
+      devansh: { isOn: false, totalTime: 0, timerStart: null, interval: null }
+    };
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
+    }
+
+    function updateDisplay(room) {
+      const data = state[room];
+      const elapsed = data.isOn && data.timerStart
+        ? data.totalTime + Math.floor((Date.now() - data.timerStart) / 1000)
+        : data.totalTime;
+      document.getElementById(`${room}-timer`).textContent = `Time ON: ${formatTime(elapsed)}`;
+
+      // Update status messages
+      const msg = document.getElementById(`${room}-msg`);
+      if (data.isOn) {
+        if (elapsed >= 3600) {
+          msg.textContent = `${room.charAt(0).toUpperCase() + room.slice(1)} may have forgotten to turn off the AC or has fallen asleep.`;
+        } else {
+          msg.textContent = `${room.charAt(0).toUpperCase() + room.slice(1)}'s AC is ON.`;
+        }
+      } else {
+        msg.textContent = `${room.charAt(0).toUpperCase() + room.slice(1)}'s AC is OFF. You can switch it ON.`;
+      }
+    }
+
+    async function loadState() {
+      const res = await fetch(`${BACKEND_URL}/state`);
+      const data = await res.json();
+
+      for (const room of rooms) {
+        state[room].isOn = data[room].isOn;
+        state[room].totalTime = data[room].totalTime || 0;
+
+        if (state[room].isOn) {
+          state[room].timerStart = Date.now();
+          state[room].interval = setInterval(() => updateDisplay(room), 1000);
+        }
+
+        document.getElementById(`${room}-toggle`).checked = state[room].isOn;
+        updateDisplay(room);
+      }
+    }
+
+    async function saveState() {
+      const payload = {};
+      for (const room of rooms) {
+        payload[room] = {
+          isOn: state[room].isOn,
+          totalTime: state[room].totalTime
+        };
+      }
+      await fetch(`${BACKEND_URL}/state`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    function stopOtherAC(activeRoom) {
+      const other = rooms.find(r => r !== activeRoom);
+      if (state[other].isOn) {
+        document.getElementById(`${other}-toggle`).checked = false;
+        toggleAC(other, false);
+      }
+    }
+
+    function toggleAC(room, turnOn) {
+      const now = Date.now();
+      const data = state[room];
+
+      if (turnOn) {
+        stopOtherAC(room);
+        data.timerStart = now;
+        data.interval = setInterval(() => updateDisplay(room), 1000);
+      } else {
+        const elapsed = Math.floor((now - data.timerStart) / 1000);
+        data.totalTime += elapsed;
+        clearInterval(data.interval);
+        data.timerStart = null;
+      }
+
+      data.isOn = turnOn;
+      updateDisplay(room);
+      saveState();
+    }
+
+    rooms.forEach(room => {
+      document.getElementById(`${room}-toggle`).addEventListener("change", (e) => {
+        toggleAC(room, e.target.checked);
+      });
+    });
+
+    loadState();
+  </script>
+</body>
+</html>
