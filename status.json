@@ -1,7 +1,0 @@
-{
-  "ac": "none",           // Which AC is ON ('none' if off)
-  "startTime": null,      // Unix timestamp when AC was turned ON
-  "duration": 0,          // Total seconds AC has been ON (accumulated)
-  "lastAC": null,         // Last AC that was ON before turning OFF
-  "lastOffTime": null     // Unix timestamp when AC was last turned OFF
-}
