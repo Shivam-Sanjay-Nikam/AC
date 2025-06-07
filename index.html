@@ -90,7 +90,7 @@
       if (turnOn) {
         stopOtherAC(room);
 
-        if (data.lastOff && now - data.lastOff < 5 * 60 * 1000) {
+        if (data.lastOff && now - data.lastOff < 1 * 60 * 1000) {
           // Resume previous session
         } else {
           data.totalTime = 0;
